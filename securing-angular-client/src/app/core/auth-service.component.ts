@@ -90,5 +90,20 @@ export class AuthService {
         this._user = user;
         return userCurrent;
     }   
+
+    /** At the completion of the signin redirect login at the STS, the STS will redirect
+     * back to the client with an authorization code in the redirect response location
+     * header. You can then add code that gets invoked when the callback comes back into the 
+     * sign-in process. That completion will get a user object populated with a resulting
+     * ID and access token for calling your APIs, which happens behind the scenes
+     * as an API request to the STS token endpoint. That call is made by UserManager when you call
+     * userManager.signinRedirectCallBack
+     */
+    async completeLogin(): Promise<any> {
+        const user = await this._userManager.signinRedirectCallback();
+        this._user = user;
+        this._loginChangedSubject.next(!!user && !user.expired);
+        return user;
+    }
     
 }
