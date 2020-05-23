@@ -105,5 +105,23 @@ export class AuthService {
         this._loginChangedSubject.next(!!user && !user.expired);
         return user;
     }
+
+    /** You need to redirect to the STS to logout so that it can invalidate the tokens
+     * and the login session.
+     */
+    logout() {
+        this._userManager.signoutRedirect();
+    }
+
+    /** Just like the login, we need to invoke this method to complete the logout process
+     * We will return the promise from the signoutRedirectCallback to the caller. Invoking
+     * this method will clear the state of the userManager and the user object that it has
+     * cached.
+     */
+    async completeLogout(): Promise<any> {
+        const user = await this._userManager.signoutRedirectCallback();
+        this._user = null;
+        return user;
+    }
     
 }
