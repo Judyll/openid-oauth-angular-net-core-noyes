@@ -26,7 +26,7 @@ import { AdminModule } from './admin/admin.module';
 import { CoreModule } from './core/core.module';
 import { SigninRedirectCallbackComponent } from './home/signin-redirect-callback.component';
 import { SignoutRedirectCallbackComponent } from './home/signout-redirect-callback.component';
-import { AuthInterceptorService } from './core/auth-interceptor.service';
+import { UnAuthorizedComponent } from './home/unauthorized.component';
 
 @NgModule({
   declarations: [
@@ -37,7 +37,8 @@ import { AuthInterceptorService } from './core/auth-interceptor.service';
     ProjectComponent,
     AddEditMilestoneDialogComponent,
     SigninRedirectCallbackComponent,
-    SignoutRedirectCallbackComponent
+    SignoutRedirectCallbackComponent,
+    UnAuthorizedComponent
   ],
   imports: [
     BrowserModule,

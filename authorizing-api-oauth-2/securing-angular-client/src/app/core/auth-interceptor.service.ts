@@ -1,12 +1,15 @@
 import { Injectable } from '@angular/core';
-import { HttpEvent, HttpInterceptor, HttpHandler, HttpRequest, HttpHeaders } from '@angular/common/http';
+import { HttpEvent, HttpInterceptor, HttpHandler, HttpRequest, HttpHeaders, HttpErrorResponse } from '@angular/common/http';
 import { Observable, from } from 'rxjs';
+import { tap } from 'rxjs/operators';
 import { AuthService } from './auth-service.component';
 import { Constants } from '../constants';
+import { Router } from '@angular/router';
 
 @Injectable()
 export class AuthInterceptorService implements HttpInterceptor {
-    constructor(private _authService: AuthService) {}
+    constructor(private _authService: AuthService,
+        private _router: Router) {}
 
     /**On of the reasons the Angular team deprecated the original http service from 
      * Angular 2 and replace it with the http client service is because the original 
@@ -46,8 +49,29 @@ export class AuthInterceptorService implements HttpInterceptor {
              */
             return from(this._authService.getAccessToken().then(token => {
                 const headers = new HttpHeaders().set('Authorization', `Bearer ${token}`);
+                /**Modify the request to include the headers */
                 const authReq = req.clone({ headers });
-                return next.handle(authReq).toPromise();
+                /**One thing we might want to add to the client is detection of authorization
+                 * errors being returned to the client and send the user somewhere in the app
+                 * or show the error. The simple way to do this is to leverage our interceptor
+                 * to look back into the response coming back from the server. One question we 
+                 * have to decide on is what is appropriate to show to the user if an API
+                 * authorization error occurs. Keep in mind, there can always be a latency 
+                 * between what the client knows and what the backend is enforcing even in a
+                 * nearly perfect system. One simple way is to add a simple view that we can
+                 * wrap the user to and tells them that they have an authorization issue and
+                 * give them an option to log out and log back in with another account that we
+                 * assume to have the right permissions. And then, we will trigger this component
+                 * navigation automatically if a 401 or 403 status is returned from an http
+                 * call. 
+                 * 
+                 */
+                return next.handle(authReq).pipe(tap(_ => { }, error => {
+                    var respError = error as HttpErrorResponse;
+                    if (respError && (respError.status === 401 || respError.status === 403)) {
+                        this._router.navigate(['/unauthorized']);
+                    }
+                })).toPromise();
             }));   
         } else {
             return next.handle(req);

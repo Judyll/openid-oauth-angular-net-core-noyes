@@ -30,7 +30,6 @@ namespace SecuringAngularApps.API.Controllers
         {
             // (from c in User.Claims select new { c.Type, c.Value })
             //     .ToList().ForEach(c => Console.WriteLine($"{c.Type}: {c.Value}"));
-
             // return _context.Projects;
 
             /*JwtClaimTypes.Subject is equivalent to the "sub" claims. This is the 
@@ -54,6 +53,8 @@ namespace SecuringAngularApps.API.Controllers
             {
                 return BadRequest(ModelState);
             }
+
+            if (!await ProjectEditAccessCheck(id, false)) return Forbid();
 
             var project = await _context.Projects
                 .Include("UserPermissions")
@@ -93,6 +94,8 @@ namespace SecuringAngularApps.API.Controllers
             {
                 return BadRequest();
             }
+
+            if (!await ProjectEditAccessCheck(id, true)) return Forbid();
 
             _context.Entry(project).State = EntityState.Modified;
 
@@ -158,6 +161,7 @@ namespace SecuringAngularApps.API.Controllers
         {
             var item = await _context.Milestones.FirstOrDefaultAsync(m => m.Id == milestone.Id);
             if (item != null) return StatusCode(409);
+            if (!await MilestoneAccessCheck(item)) return Forbid();
             _context.Milestones.Add(milestone);
             await _context.SaveChangesAsync();
             return CreatedAtAction("GetProject", new { id = milestone.ProjectId }, milestone);
@@ -168,6 +172,7 @@ namespace SecuringAngularApps.API.Controllers
         {
             var item = await _context.Milestones.FirstOrDefaultAsync(m => m.Id == id);
             if (item == null) return NotFound();
+            if (!await MilestoneAccessCheck(item)) return Forbid();
             _context.Milestones.Remove(item);
             await _context.SaveChangesAsync();
             return Ok();
@@ -179,10 +184,40 @@ namespace SecuringAngularApps.API.Controllers
             if (milestone.Id != id) return BadRequest();
             var item = await _context.Milestones.FirstOrDefaultAsync(ms => ms.Id == id);
             if (item == null) return NotFound();
+            if (!await MilestoneAccessCheck(item)) return Forbid();
             item.MilestoneStatusId = milestone.MilestoneStatusId;
             item.Name = milestone.Name;
             await _context.SaveChangesAsync();
             return Ok(milestone);
+        }
+
+        /*User should be restricted to not add, edit, or delete milestones
+        unless they have that permission. As discussed before, the only secure
+        place to enforce that access is on the back-end. So,we will be adding
+        an access control guard on the CRUD methods, and return the appropriate
+        error is the user is not authorized to access those methods. To do that, it
+        will depend on the app, framework and the permission mechanism you are using.
+        In the case for this solution, we are using the simple UserPermission mapping
+        object as part of the data model. So, we will add a helper method below that
+        look up for the permission of the user and project based on the milestone
+        that has been edited, and return the boolean flag whether they do or do not
+        have permission.*/
+        private async Task<bool> MilestoneAccessCheck(Milestone item) 
+        {
+            var userId = this.User.FindFirstValue(JwtClaimTypes.Subject);
+            var perm = await _context.UserPermissions.FirstOrDefaultAsync(up =>
+                up.ProjectId == item.ProjectId && up.UserProfileId == userId);
+            return (perm != null && perm.Value == "Edit");
+        }
+        /*Some of the other operations in this controller should be restricted
+        based on the user's permissions as well. So, we will add another helper method
+        to check permissions for project level operations.*/
+        private async Task<bool> ProjectEditAccessCheck(int projectId, bool edit) 
+        {
+            var userId = this.User.FindFirstValue(JwtClaimTypes.Subject);
+            var userAccess = await _context.UserPermissions.FirstOrDefaultAsync(up =>
+                up.ProjectId == projectId && up.UserProfileId == userId);
+            return (userAccess != null && (edit ? userAccess.Value == "Edit" : true));
         }
 
         [HttpGet("MilestoneStatuses")]
