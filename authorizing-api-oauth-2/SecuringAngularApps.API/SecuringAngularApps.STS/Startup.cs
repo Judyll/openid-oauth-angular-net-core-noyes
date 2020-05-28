@@ -39,7 +39,11 @@ namespace SecuringAngularApps.STS
                 {
                     corsBuilder.AllowAnyHeader()
                     .AllowAnyMethod()
-                    .AllowAnyOrigin()
+                    /*This fixes the error:
+                    The CORS protocol does not allow specifying wildcard (any) origin
+                    and credentials at the same time.
+                    */
+                    .SetIsOriginAllowed(origin => origin == "http://localhost:4200")
                     .AllowCredentials();
                 });
             });

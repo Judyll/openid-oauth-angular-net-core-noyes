@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Linq;
+using IdentityServer4.AccessTokenValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -31,14 +32,34 @@ namespace SecuringAngularApps.API
                 {
                     builder.AllowAnyHeader()
                     .AllowAnyMethod()
+                    /*This fixes the error:
+                    The CORS protocol does not allow specifying wildcard (any) origin
+                    and credentials at the same time.
+                    */
                     .SetIsOriginAllowed(origin => origin == "http://localhost:4200")
                     .AllowCredentials();
                 });
             });
-            services.AddAuthentication("Bearer")
-                .AddJwtBearer("Bearer", options => {
+            /*Using the Microsoft Authentication middleware sets default mapping URIs for the 
+            claims that have named URIs associated with them. For example:
+            http://schemas.microsoft.com/ws/2008/06/identity/claims/role: Admin
+            http://schemas.microsoft.com/claims/authmethodsreferences: pwd
+            This is not really a great thing since you can tell by the years in some of these urls
+            the mapping are quite outdated or not part of the OAuth 2.0 spec.
+            So, we are going to switch from a Microsoft Authentication Middleware to a wrapper
+            around that provided by the IdentityServer4 which is the IdentityServer4.AccessTokenValidation.
+            We will now use the IdentityServer's helper methods instead of the Microsoft ones.
+            */
+            // services.AddAuthentication("Bearer")
+            //     .AddJwtBearer("Bearer", options => {
+            //         options.Authority = "http://localhost:4242";
+            //         options.Audience = "projects-api";
+            //         options.RequireHttpsMetadata = false;
+            //     });            
+            services.AddAuthentication(IdentityServerAuthenticationDefaults.AuthenticationScheme)
+                .AddIdentityServerAuthentication(options => {
                     options.Authority = "http://localhost:4242";
-                    options.Audience = "projects-api";
+                    options.ApiName = "projects-api";
                     options.RequireHttpsMetadata = false;
                 });
             /* Making the whole site secure by default by adding a global authentication

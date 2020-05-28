@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+using IdentityModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -27,7 +28,22 @@ namespace SecuringAngularApps.API.Controllers
         [HttpGet]
         public IEnumerable<Project> GetProjects()
         {
-            return _context.Projects;
+            // (from c in User.Claims select new { c.Type, c.Value })
+            //     .ToList().ForEach(c => Console.WriteLine($"{c.Type}: {c.Value}"));
+
+            // return _context.Projects;
+
+            /*JwtClaimTypes.Subject is equivalent to the "sub" claims. This is the 
+            subject claims from the claims principle.
+            */
+            var userId = this.User.FindFirstValue(JwtClaimTypes.Subject);
+            /*If we need to filter the projects based on the user, we just need a 
+            relationship in the data model between the user id that comes from the 
+            STS and the project. On this solution, that model is UserPermission.
+            */
+            List<int> userProjectIds = _context.UserPermissions.Where(up => up.ProjectId.HasValue
+                && up.UserProfileId == userId).Select(up => up.ProjectId.Value).ToList();
+            return _context.Projects.Where(p => userProjectIds.Contains(p.Id));
         }
 
         // GET: api/Projects/5
