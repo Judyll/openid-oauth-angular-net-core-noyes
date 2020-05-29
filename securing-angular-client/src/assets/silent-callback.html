@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024, initial-scale=1.0">
+    <title>Document</title>
+    <!-- Since this is a flat HTML page, we have to bring the script differently
+    that we do in Angular. We could either link to a CDN version of the library
+    or create a local copy within the project that gets deployed with it. We will
+    do the latter. -->
+    <script src="/assets/js/oidc-client.min.js"></script>
+</head>
+
+<body>
+    <!--We are adding a script block to the body and in there, we will be creating
+    an STS settings object with several settings that are compatible with the AuthService
+    UserManager.-->
+    <script>
+        const stsSettings = {
+            authority: "https://securingangularappscoursev2-sts.azurewebsites.net/",
+            client_id: "spa-client",
+            scope: "openid profile projects-api",
+            response_type: "code"
+        };
+        new Oidc.UserManager(stsSettings).signinSilentCallback().catch(error => {
+            console.error(error);
+        });
+    </script>
+</body>
+
+</html>

@@ -50,9 +50,26 @@ export class AuthService {
              * login and logout at the STS because that is where the lifetime and granting of the
              * tokens happen.
              */
-            post_logout_redirect_uri: `${Constants.clientRoot}signout-callback`
+            post_logout_redirect_uri: `${Constants.clientRoot}signout-callback`,
+            /** This is used for silent renewal of the tokens when expired */
+            automaticSilentRenew: true,
+            /** This tells the STS where to redirect to after a silent redirect
+             * to complete a process like login. Note that this is a bit different
+             * than the other callbacks. The callback urls that where used for login
+             * and logout are client side routes to routed views in our Angular 
+             * application. Those where loaded momentarily only to complete the logout
+             * or login process. For silent review, we don't want to pay the overhead of 
+             * loading the entire Angular into a complete iFrame just to complete
+             * the silent renew process. So, we are adding a new HTML page that will do
+             * nothing but to complete the silent renew process. 
+             */
+            silent_redirect_uri: `${Constants.clientRoot}assets/silent-callback.html`
         };
         this._userManager = new UserManager(stsSettings);
+        /**Fire the _loginChangedSubject observable when the token expires */
+        this._userManager.events.addAccessTokenExpired(_ => {
+            this._loginChangedSubject.next(false);
+        });
     }
 
     /** User Manager makes login easy for us. You don't need to know what the request of the STS
@@ -121,6 +138,10 @@ export class AuthService {
     async completeLogout(): Promise<any> {
         const user = await this._userManager.signoutRedirectCallback();
         this._user = null;
+        /**Fire the _loginChangedSubject observable when the token expires */
+        this._userManager.events.addAccessTokenExpired(_ => {
+            this._loginChangedSubject.next(false);
+        });
         return user;
     }
     
