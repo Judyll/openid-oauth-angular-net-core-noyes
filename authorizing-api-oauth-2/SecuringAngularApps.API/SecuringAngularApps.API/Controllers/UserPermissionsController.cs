@@ -12,6 +12,7 @@ namespace SecuringAngularApps.API.Controllers
 {
     [Produces("application/json")]
     [Route("api/UserPermissions")]
+    [Authorize(Roles = "Admin")]
     public class UserPermissionsController : Controller
     {
         private readonly ProjectDbContext _context;

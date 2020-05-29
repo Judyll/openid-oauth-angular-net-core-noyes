@@ -32,17 +32,31 @@ namespace SecuringAngularApps.API.Controllers
             //     .ToList().ForEach(c => Console.WriteLine($"{c.Type}: {c.Value}"));
             // return _context.Projects;
 
-            /*JwtClaimTypes.Subject is equivalent to the "sub" claims. This is the 
-            subject claims from the claims principle.
-            */
-            var userId = this.User.FindFirstValue(JwtClaimTypes.Subject);
-            /*If we need to filter the projects based on the user, we just need a 
-            relationship in the data model between the user id that comes from the 
-            STS and the project. On this solution, that model is UserPermission.
-            */
-            List<int> userProjectIds = _context.UserPermissions.Where(up => up.ProjectId.HasValue
-                && up.UserProfileId == userId).Select(up => up.ProjectId.Value).ToList();
-            return _context.Projects.Where(p => userProjectIds.Contains(p.Id));
+            /*Another thing we want to base authorization decision on is a role claim
+            or other custom claim. Each identity provider will be a little different
+            on how you can add custom claims in the access token that are issued by
+            the STS. We have modified the IdentityServer4 code STS by adding 
+            CustomProfileService.cs (D:\Documents\Dev-Repo\openid-oauth-angular-net-core-noyes
+            \authorizing-api-oauth-2\SecuringAngularApps.API\SecuringAngularApps.STS\Quickstart
+            \Account\CustomProfileService.cs line #33) 
+            that we can use to add role to the admin if the admin user
+            is logged in. We can use this for access control or data filtering depending on
+            how we used the identity of the user*/
+            if (User.IsInRole("Admin")) {
+                return _context.Projects;
+            } else {
+                /*JwtClaimTypes.Subject is equivalent to the "sub" claims. This is the 
+                subject claims from the claims principle.
+                */
+                var userId = this.User.FindFirstValue(JwtClaimTypes.Subject);
+                /*If we need to filter the projects based on the user, we just need a 
+                relationship in the data model between the user id that comes from the 
+                STS and the project. On this solution, that model is UserPermission.
+                */
+                List<int> userProjectIds = _context.UserPermissions.Where(up => up.ProjectId.HasValue
+                    && up.UserProfileId == userId).Select(up => up.ProjectId.Value).ToList();
+                return _context.Projects.Where(p => userProjectIds.Contains(p.Id));
+            }            
         }
 
         // GET: api/Projects/5
@@ -54,7 +68,7 @@ namespace SecuringAngularApps.API.Controllers
                 return BadRequest(ModelState);
             }
 
-            if (!await ProjectEditAccessCheck(id, false)) return Forbid();
+            if (!await ProjectEditAccessCheck(id, false) && !User.IsInRole("Admin")) return Forbid();
 
             var project = await _context.Projects
                 .Include("UserPermissions")
@@ -69,7 +83,10 @@ namespace SecuringAngularApps.API.Controllers
             return Ok(project);
         }
 
+        /*This should only be called by admin when going into the manage projects page
+        so we will add a role check there with the authorized attribute*/
         [HttpGet("{id}/Users")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetProjectUsers([FromRoute] int id)
         {
             var perms = await _context.UserPermissions.Where(up => up.ProjectId == id).ToListAsync();
@@ -95,7 +112,7 @@ namespace SecuringAngularApps.API.Controllers
                 return BadRequest();
             }
 
-            if (!await ProjectEditAccessCheck(id, true)) return Forbid();
+            if (!await ProjectEditAccessCheck(id, true) && !User.IsInRole("Admin")) return Forbid();
 
             _context.Entry(project).State = EntityState.Modified;
 
@@ -120,6 +137,7 @@ namespace SecuringAngularApps.API.Controllers
 
         // POST: api/Projects
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> PostProject([FromBody] Project project)
         {
             if (!ModelState.IsValid)
@@ -135,6 +153,7 @@ namespace SecuringAngularApps.API.Controllers
 
         // DELETE: api/Projects/5
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteProject([FromRoute] int id)
         {
             if (!ModelState.IsValid)
@@ -161,7 +180,7 @@ namespace SecuringAngularApps.API.Controllers
         {
             var item = await _context.Milestones.FirstOrDefaultAsync(m => m.Id == milestone.Id);
             if (item != null) return StatusCode(409);
-            if (!await MilestoneAccessCheck(item)) return Forbid();
+            if (!await MilestoneAccessCheck(item) && !User.IsInRole("Admin")) return Forbid();
             _context.Milestones.Add(milestone);
             await _context.SaveChangesAsync();
             return CreatedAtAction("GetProject", new { id = milestone.ProjectId }, milestone);
@@ -172,7 +191,7 @@ namespace SecuringAngularApps.API.Controllers
         {
             var item = await _context.Milestones.FirstOrDefaultAsync(m => m.Id == id);
             if (item == null) return NotFound();
-            if (!await MilestoneAccessCheck(item)) return Forbid();
+            if (!await MilestoneAccessCheck(item) && !User.IsInRole("Admin")) return Forbid();
             _context.Milestones.Remove(item);
             await _context.SaveChangesAsync();
             return Ok();
@@ -184,7 +203,7 @@ namespace SecuringAngularApps.API.Controllers
             if (milestone.Id != id) return BadRequest();
             var item = await _context.Milestones.FirstOrDefaultAsync(ms => ms.Id == id);
             if (item == null) return NotFound();
-            if (!await MilestoneAccessCheck(item)) return Forbid();
+            if (!await MilestoneAccessCheck(item) && !User.IsInRole("Admin")) return Forbid();
             item.MilestoneStatusId = milestone.MilestoneStatusId;
             item.Name = milestone.Name;
             await _context.SaveChangesAsync();
